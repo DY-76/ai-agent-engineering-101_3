@@ -5,11 +5,16 @@ per bid, so ToolCall/run_tools are dropped and Reply is just text.
 
 Provider is picked from the environment:
   ANTHROPIC_API_KEY set          -> Anthropic SDK (pip install anthropic)
-  otherwise                      -> OpenAI-compatible (pip install openai)
-                                    OPENAI_API_KEY, optional OPENAI_BASE_URL
-                                    (https://openrouter.ai/api/v1 for OpenRouter)
+  otherwise                      -> OpenAI SDK (pip install openai), plain OpenAI
+                                    by default; set OPENAI_BASE_URL to point at
+                                    an OpenAI-compatible provider (e.g. OpenRouter)
   AGENT_MODEL                    optional model override for either provider
-  AGENT_TEMPERATURE              optional float, default 0.7
+                                    (default here: gpt-5-mini)
+  AGENT_TEMPERATURE              optional float; ignored for reasoning models
+                                    (gpt-5*, o1*, o3*, o4*), which only support
+                                    their fixed default temperature
+  AGENT_REASONING_EFFORT         optional, e.g. "low"/"medium"/"high", passed
+                                    through to reasoning models only
 """
 import os
 from dataclasses import dataclass
@@ -17,8 +22,15 @@ from dataclasses import dataclass
 PROVIDER = "anthropic" if os.environ.get("ANTHROPIC_API_KEY") else "openai"
 MODEL = os.environ.get(
     "AGENT_MODEL",
-    "claude-sonnet-4-5" if PROVIDER == "anthropic" else "gpt-4o-mini")
+    "claude-sonnet-4-5" if PROVIDER == "anthropic" else "gpt-5-mini")
 TEMPERATURE = float(os.environ.get("AGENT_TEMPERATURE", "0.7"))
+REASONING_EFFORT = os.environ.get("AGENT_REASONING_EFFORT")
+
+# reasoning models (gpt-5 family, o1, o3, o4) reject a custom temperature and
+# only take the API's default; skip the parameter entirely for them instead
+# of guessing which value they'll accept.
+_REASONING_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+IS_REASONING_MODEL = PROVIDER == "openai" and MODEL.startswith(_REASONING_PREFIXES)
 
 _client = None
 
@@ -80,8 +92,13 @@ class Chat:
         return Reply(text)
 
     def _send_openai(self) -> Reply:
-        resp = _get_client().chat.completions.create(
-            model=MODEL, temperature=TEMPERATURE, messages=self.messages)
+        kwargs = dict(model=MODEL, messages=self.messages)
+        if IS_REASONING_MODEL:
+            if REASONING_EFFORT:
+                kwargs["reasoning_effort"] = REASONING_EFFORT
+        else:
+            kwargs["temperature"] = TEMPERATURE
+        resp = _get_client().chat.completions.create(**kwargs)
         usage = resp.usage
         self.meter.add(getattr(usage, "prompt_tokens", 0),
                         getattr(usage, "completion_tokens", 0))
