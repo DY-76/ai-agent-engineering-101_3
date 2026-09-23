@@ -23,3 +23,15 @@ run,condition,scenario,deal_possible,outcome,price,correct,violation,turns,forma
 21,tagged,s2,1,deal,480,1,0,8,0,7,agent_calls=8
 21,tagged,s3,0,open,,1,0,8,0,7,agent_calls=8
 21,tagged,s4,0,open,,1,0,8,0,7,agent_calls=8
+25,free,s1,1,open,,0,0,8,0,8,agent_calls=8
+25,free,s2,1,deal,500,1,0,7,0,7,agent_calls=7
+25,free,s3,0,open,,1,0,8,0,8,agent_calls=8
+25,free,s4,0,open,,1,0,8,0,8,agent_calls=8
+29,free,s1,1,deal,167,1,0,8,0,8,agent_calls=8
+29,free,s2,1,deal,500,1,0,7,0,7,agent_calls=7
+29,free,s3,0,open,,1,0,8,0,8,agent_calls=8
+29,free,s4,0,open,,1,0,8,0,8,agent_calls=8
+33,free,s1,1,deal,210,1,0,7,0,7,agent_calls=7
+33,free,s2,1,open,,0,0,8,0,8,agent_calls=8
+33,free,s3,0,open,,1,0,8,0,8,agent_calls=8
+33,free,s4,0,open,,1,0,8,0,8,agent_calls=8
