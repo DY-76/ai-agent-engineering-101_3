@@ -75,20 +75,31 @@
 
 - **How to run:**
   ```bash
+  export OPENAI_API_KEY=<your OpenAI key>
   cd submissions/25520051/week-04
   python run_experiment.py --repeats 3
   python ../../../scripts/check_week04.py ..
   ```
   (`check_week04.py` takes the parent `week-04` directory; adjust the relative
-  path to `scripts/` for wherever you invoke it from.) `run_experiment.py` also
-  accepts `--condition {free,tagged,structured}` and `--start-repeat N` to run
-  the experiment in smaller chunks — `results.csv` is appended, not
-  overwritten, so calling it multiple times is safe and was how the reference
-  run below was actually produced (each `claude -p` call takes on the order of
-  seconds to tens of seconds, so 36 episodes end up as several hundred CLI
-  invocations). With an API key set instead (`ANTHROPIC_API_KEY` or
-  `OPENAI_API_KEY`), the same code runs through the SDK path in `llm_chat.py`
-  and temperature (`AGENT_TEMPERATURE`, default 0.7) becomes settable again.
+  path to `scripts/` for wherever you invoke it from.) [`llm_chat.py`](./llm_chat.py)
+  defaults to `gpt-5-mini` on the OpenAI SDK when `OPENAI_API_KEY` is set
+  (`ANTHROPIC_API_KEY` switches it to the Anthropic SDK instead); override the
+  model with `AGENT_MODEL` and the temperature with `AGENT_TEMPERATURE`
+  (default 0.7, ignored for `gpt-5-mini` since it is a reasoning model and only
+  accepts the API's fixed default). `run_experiment.py` also accepts
+  `--condition {free,tagged,structured}` and `--start-repeat N` to run the
+  experiment in smaller chunks — `results.csv` is appended, not overwritten, so
+  calling it multiple times is safe.
+
+  The reference run in §2 below predates this: it was produced with an earlier
+  version of `llm_chat.py` that shelled out to the Claude Code CLI
+  (`claude -p --model haiku`) as a stand-in for an API key, since none was
+  available at the time (each call took seconds to tens of seconds, so 36
+  episodes became several hundred CLI invocations). That CLI path has since
+  been removed — this assignment is meant to run against a real API — and
+  `llm_chat.py` now only ever calls the Anthropic or OpenAI SDK. The results,
+  logs, and analysis below are unchanged and still describe that CLI-based run;
+  they have not been regenerated with `gpt-5-mini`.
 - **Scenarios** ([`scenarios.json`](./scenarios.json)): 4 scenarios, 2 with a
   deal possible (`s1` mountain bike, reserve 150/budget 220, wide overlap;
   `s2` used laptop, reserve 480/budget 500, narrow overlap) and 2 impossible
