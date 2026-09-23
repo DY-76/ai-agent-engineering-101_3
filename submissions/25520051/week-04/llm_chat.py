@@ -1,39 +1,26 @@
 """Week 04 — model call and meter, adapted from week-03's llm_chat.py.
 
-Same Chat/Meter shape, plus a third provider: shelling out to the Claude
-Code CLI (`claude -p`) when no API key is set in the environment. This
-repo's README recommends exactly this for week 04's reference run, and it
-lets the negotiation run without asking for or hardcoding a key.
+Same Chat/Meter shape and the same two providers as week 03: this
+assignment runs through a real API, not a CLI wrapper.
 
 Provider is picked from the environment:
   ANTHROPIC_API_KEY set          -> Anthropic SDK (pip install anthropic)
-  elif OPENAI_API_KEY set        -> OpenAI SDK (pip install openai); set
-                                    OPENAI_BASE_URL to point at an
-                                    OpenAI-compatible provider (e.g. OpenRouter)
-  else                           -> `claude -p` subprocess (needs the Claude
-                                    Code CLI on PATH and an active login)
-  AGENT_MODEL                    optional model override for any provider
-                                    (default: gpt-5-mini for openai, haiku
-                                    alias for anthropic/cli)
-  AGENT_TEMPERATURE              optional float; ignored for reasoning
-                                    models (gpt-5*, o1*, o3*, o4*) and for
-                                    the cli provider, which exposes no
-                                    temperature flag at all
+  otherwise                      -> OpenAI SDK (pip install openai), plain OpenAI
+                                    by default; set OPENAI_BASE_URL to point at
+                                    an OpenAI-compatible provider (e.g. OpenRouter)
+  AGENT_MODEL                    optional model override for either provider
+                                    (default here: gpt-5-mini)
+  AGENT_TEMPERATURE              optional float; ignored for reasoning models
+                                    (gpt-5*, o1*, o3*, o4*), which only support
+                                    their fixed default temperature
 """
 import os
-import subprocess
 from dataclasses import dataclass
 
-if os.environ.get("ANTHROPIC_API_KEY"):
-    PROVIDER = "anthropic"
-elif os.environ.get("OPENAI_API_KEY"):
-    PROVIDER = "openai"
-else:
-    PROVIDER = "cli"
-
+PROVIDER = "anthropic" if os.environ.get("ANTHROPIC_API_KEY") else "openai"
 MODEL = os.environ.get(
     "AGENT_MODEL",
-    "gpt-5-mini" if PROVIDER == "openai" else "haiku")
+    "gpt-5-mini" if PROVIDER == "openai" else "claude-sonnet-4-5")
 TEMPERATURE = float(os.environ.get("AGENT_TEMPERATURE", "0.7"))
 
 # reasoning models (gpt-5 family, o1, o3, o4) reject a custom temperature and
@@ -58,11 +45,7 @@ def _get_client():
 
 
 class Meter:
-    """Tokens and model-call count, same idea as weeks 02-03's Meter.
-
-    The cli provider reports no usage, so tokens stay 0 for it; calls is
-    still accurate since Meter.add() always increments it.
-    """
+    """Tokens and model-call count, same idea as weeks 02-03's Meter."""
 
     def __init__(self):
         self.tokens = 0
@@ -79,13 +62,7 @@ class Reply:
 
 
 class Chat:
-    """One conversation with the model: a system prompt plus user turns.
-
-    For the cli provider there is no persistent session, so each send()
-    replays the whole transcript (this side's replies as "You", the other
-    side's as "Them") as a single -p prompt; the system prompt still goes
-    through --system-prompt so it is never mixed into the transcript text.
-    """
+    """One conversation with the model: a system prompt plus user turns."""
 
     def __init__(self, system: str, meter: Meter):
         self.system = system
@@ -100,8 +77,6 @@ class Chat:
     def send(self) -> Reply:
         if PROVIDER == "anthropic":
             return self._send_anthropic()
-        if PROVIDER == "cli":
-            return self._send_cli()
         return self._send_openai()
 
     def _send_anthropic(self) -> Reply:
@@ -126,30 +101,3 @@ class Chat:
         msg = resp.choices[0].message
         self.messages.append({"role": "assistant", "content": msg.content or ""})
         return Reply(msg.content or "")
-
-    def _send_cli(self) -> Reply:
-        # A single user turn (e.g. a one-shot reader call) goes through as
-        # its own text -- the You/Them transcript framing below is only for
-        # genuine multi-turn dialogue, and wrapping a one-shot instruction in
-        # it makes the model treat "You:" as a cue to ask for the message
-        # instead of just answering.
-        if len(self.messages) == 1 and self.messages[0]["role"] == "user":
-            prompt = self.messages[0]["content"]
-        else:
-            lines = []
-            for m in self.messages:
-                speaker = "You" if m["role"] == "assistant" else "Them"
-                lines.append(f"{speaker}: {m['content']}")
-            prompt = "\n\n".join(lines) + "\n\nYou:"
-        cmd = ["claude", "-p", prompt, "--model", MODEL,
-               "--system-prompt", self.system]
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=60)
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"claude -p exited {result.returncode}: {result.stderr[:500]}")
-        text = result.stdout.strip()
-        self.meter.add(0, 0)
-        self.messages.append({"role": "assistant", "content": text})
-        return Reply(text)
