@@ -145,7 +145,7 @@ class Chat:
                "--system-prompt", self.system]
         result = subprocess.run(
             cmd, capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=120)
+            errors="replace", timeout=60)
         if result.returncode != 0:
             raise RuntimeError(
                 f"claude -p exited {result.returncode}: {result.stderr[:500]}")
